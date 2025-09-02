@@ -24,13 +24,17 @@ async fn test_daemon_cil_communication() -> anyhow::Result<()> {
         .output()
         .await?;
 
-    // Clean-up, maybe RAII?
-    let _ = daemon.kill().await;
-    let _ = std::fs::remove_file(&socket_path);
-
     // Assertions
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).contains("Sending: hello test"));
 
+    // Send SIGTERM to gracefully shut down the daemon
+    let daemon_id = daemon.id().expect("Failed to get daemon PID");
+    let _ = std::process::Command::new("kill")
+        .args(["-TERM", &daemon_id.to_string()])
+        .status();
+
+    let _ = daemon.wait().await;
+    assert!(!std::fs::exists(socket_path)?, "Socket file clean-up failed.");
     Ok(())
 }

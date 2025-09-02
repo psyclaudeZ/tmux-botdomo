@@ -31,12 +31,33 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+struct SocketGuard {
+    path: PathBuf,
+}
+
+impl SocketGuard {
+    fn new(path: PathBuf) -> SocketGuard {
+        Self {
+            path
+        }
+    }
+}
+
+impl Drop for SocketGuard {
+    fn drop(&mut self) {
+        println!("Cleaning up socket file.");
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 async fn start_daemon() -> anyhow::Result<()> {
     println!("Starting daemon...");
     // TODO: check instance, socket
     let socket_path = PathBuf::from(get_socket_path());
+    let _socket_guard = SocketGuard::new(socket_path.clone());
     // TODO: error handling
     let listener = UnixListener::bind(socket_path).unwrap();
+    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
 
     loop {
         tokio::select! {
@@ -48,12 +69,16 @@ async fn start_daemon() -> anyhow::Result<()> {
                 println!("Received {buffer}");
             }
             _ = tokio::signal::ctrl_c() => {
-                println!("Shutting down...");
+                println!("Received SIGINT, shutting down...");
+                break;
+            }
+            _ = sigterm.recv() => {
+                println!("Received SIGTERM, shutting down...");
                 break;
             }
         }
     }
-    // TODO: cleanup socket
+
     Ok(())
 }
 
