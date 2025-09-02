@@ -12,7 +12,6 @@ async fn test_daemon_cil_communication() -> anyhow::Result<()> {
         .env("TMUX_BOTDOMO_SOCK_PATH", &socket_path)
         .spawn()?;
 
-
     sleep(Duration::from_millis(500)).await;
     if tokio::fs::try_exists(&socket_path).await.is_err() {
         anyhow::bail!("Socket not ready");
@@ -35,6 +34,9 @@ async fn test_daemon_cil_communication() -> anyhow::Result<()> {
         .status();
 
     let _ = daemon.wait().await;
-    assert!(!std::fs::exists(socket_path)?, "Socket file clean-up failed.");
+    assert!(
+        !std::fs::exists(socket_path)?,
+        "Socket file clean-up failed."
+    );
     Ok(())
 }

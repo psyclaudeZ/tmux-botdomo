@@ -37,9 +37,7 @@ struct SocketGuard {
 
 impl SocketGuard {
     fn new(path: PathBuf) -> SocketGuard {
-        Self {
-            path
-        }
+        Self { path }
     }
 }
 
