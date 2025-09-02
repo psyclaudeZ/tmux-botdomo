@@ -4,7 +4,7 @@ use tokio::net::UnixListener;
 
 use clap::{Parser, Subcommand};
 
-use tmux_botdomo::common::TMUX_BOTDOMO_SOCK_PATH;
+use tmux_botdomo::common::get_socket_path;
 
 #[derive(Parser)]
 #[command(name = "tbdd")]
@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
 async fn start_daemon() -> anyhow::Result<()> {
     println!("Starting daemon...");
     // TODO: check instance, socket
-    let socket_path = PathBuf::from(TMUX_BOTDOMO_SOCK_PATH);
+    let socket_path = PathBuf::from(get_socket_path());
     // TODO: error handling
     let listener = UnixListener::bind(socket_path).unwrap();
 
