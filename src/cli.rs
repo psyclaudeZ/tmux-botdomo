@@ -3,7 +3,7 @@ use tmux_botdomo::common::get_socket_path;
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 
 #[derive(Parser)]
-#[command(name = "tbd")]
+#[command(name = "tbdm")]
 struct Args {
     #[command(subcommand)]
     command: Command,

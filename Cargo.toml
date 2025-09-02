@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "tbdd"
+name = "tbdmd"
 path = "src/daemon.rs"
 
 [[bin]]
-name = "tbd"
+name = "tbdm"
 path = "src/cli.rs"
 
 [dependencies]

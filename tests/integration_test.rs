@@ -8,7 +8,7 @@ async fn test_daemon_cil_communication() -> anyhow::Result<()> {
     let socket_path = format!("/tmp/tmux-botdomo-test-{test_id}.sock");
 
     let mut daemon = Command::new("cargo")
-        .args(["run", "--bin", "tbdd", "start"])
+        .args(["run", "--bin", "tbdmd", "start"])
         .env("TMUX_BOTDOMO_SOCK_PATH", &socket_path)
         .spawn()?;
 
@@ -19,7 +19,7 @@ async fn test_daemon_cil_communication() -> anyhow::Result<()> {
     }
 
     let output = Command::new("cargo")
-        .args(["run", "--bin", "tbd", "send", "hello test"])
+        .args(["run", "--bin", "tbdm", "send", "hello test"])
         .env("TMUX_BOTDOMO_SOCK_PATH", &socket_path)
         .output()
         .await?;

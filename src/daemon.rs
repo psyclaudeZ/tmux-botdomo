@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use tmux_botdomo::common::get_socket_path;
 
 #[derive(Parser)]
-#[command(name = "tbdd")]
+#[command(name = "tbdmd")]
 struct Args {
     #[command(subcommand)]
     command: Command,
