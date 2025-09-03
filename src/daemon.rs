@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
@@ -57,6 +58,7 @@ async fn start_daemon() -> anyhow::Result<()> {
     let listener = UnixListener::bind(socket_path).unwrap();
     let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
 
+    get_claude_code_locations().await?;
     loop {
         tokio::select! {
             Ok((mut stream, _)) = listener.accept() => {
@@ -81,5 +83,18 @@ async fn start_daemon() -> anyhow::Result<()> {
 }
 
 async fn stop_daemon() -> anyhow::Result<()> {
+    Ok(())
+}
+
+async fn get_claude_code_locations() -> anyhow::Result<()> {
+    let output = tokio::process::Command::new("pgrep")
+        .args(["-x", "claude"])
+        .output()
+        .await?;
+    let pids: HashSet<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
+    println!("Claude Code pids: {:?}", pids);
     Ok(())
 }
