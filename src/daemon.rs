@@ -87,14 +87,42 @@ async fn stop_daemon() -> anyhow::Result<()> {
 }
 
 async fn get_claude_code_locations() -> anyhow::Result<()> {
+    // TODO: clean up, consolidate, etc.
     let output = tokio::process::Command::new("pgrep")
         .args(["-x", "claude"])
         .output()
         .await?;
     let pids: HashSet<String> = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(|s| s.to_string())
-            .collect();
-    println!("Claude Code pids: {:?}", pids);
+        .lines()
+        .map(|s| s.to_string())
+        .collect();
+    for pid in &pids {
+        let tty = tokio::process::Command::new("ps")
+            .args(["-p", pid, "-o", "tty="])
+            .output()
+            .await?;
+        println!("Claude Code session pid {} on tty {:?}", pid, tty);
+    }
+    let tmux_ls_output = tokio::process::Command::new("tmux")
+        .args([
+            "list-panes",
+            "-a",
+            "-F",
+            "#{session_id} #{pane_id} #{pane_tty}",
+        ])
+        .output()
+        .await?;
+    let tmux_ls: Vec<(String, String, String)> = String::from_utf8_lossy(&tmux_ls_output.stdout)
+        .lines()
+        .map(|s| {
+            let segs: Vec<&str> = s.split_whitespace().collect();
+            (
+                segs[0].to_string(),
+                segs[1].to_string(),
+                segs[2].to_string(),
+            )
+        })
+        .collect();
+    println!("tmux list-panes info {:?}", tmux_ls);
     Ok(())
 }
