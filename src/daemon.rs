@@ -97,11 +97,23 @@ async fn get_claude_code_locations() -> anyhow::Result<()> {
         .map(|s| s.to_string())
         .collect();
     for pid in &pids {
-        let tty = tokio::process::Command::new("ps")
+        let tty_output = tokio::process::Command::new("ps")
             .args(["-p", pid, "-o", "tty="])
             .output()
             .await?;
-        println!("Claude Code session pid {} on tty {:?}", pid, tty);
+        let tty = String::from_utf8_lossy(&tty_output.stdout).trim().to_string();
+        let cwd_output = tokio::process::Command::new("sh")
+            .args(["-c", &format!("lsof -p {} | grep cwd", pid)])
+            .output()
+            .await?;
+
+        let cwd: Option<String> = String::from_utf8_lossy(&cwd_output.stdout)
+            .lines()
+            .next()
+            .and_then(|line| line.split_whitespace().last())
+            .map(|s| s.to_string());
+
+        println!("Claude Code session pid {} on tty {:?}, cwd: {:?}", pid, tty, cwd.unwrap_or("<n/a>".to_string()));
     }
     let tmux_ls_output = tokio::process::Command::new("tmux")
         .args([
