@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
@@ -49,6 +49,55 @@ impl Drop for SocketGuard {
     }
 }
 
+#[derive(Debug)]
+enum Agent {
+    ClaudeCode,
+}
+
+#[derive(Debug)]
+struct TmuxLocation {
+    session_id: String,
+    window_id: String,
+    pane_id: String,
+}
+
+impl TmuxLocation {
+    fn new(session_id: String, window_id: String, pane_id: String) -> Self {
+        Self {
+            session_id,
+            window_id,
+            pane_id,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct AgentSessionInfo {
+    agent: Agent,
+    cwd: String,
+    pane_tty: String,
+    pid: String,
+    tmux_location: TmuxLocation,
+}
+
+impl AgentSessionInfo {
+    fn new(
+        agent: Agent,
+        cwd: String,
+        pane_tty: String,
+        pid: String,
+        tmux_location: TmuxLocation,
+    ) -> Self {
+        Self {
+            agent,
+            cwd,
+            pane_tty,
+            pid,
+            tmux_location,
+        }
+    }
+}
+
 async fn start_daemon() -> anyhow::Result<()> {
     println!("Starting daemon...");
     // TODO: check instance, socket
@@ -88,6 +137,32 @@ async fn stop_daemon() -> anyhow::Result<()> {
 
 async fn get_claude_code_locations() -> anyhow::Result<()> {
     // TODO: clean up, consolidate, etc.
+    let tmux_ls_output = tokio::process::Command::new("tmux")
+        .args([
+            "list-panes",
+            "-a",
+            "-F",
+            "#{session_id} #{window_id} #{pane_id} #{pane_tty}",
+        ])
+        .output()
+        .await?;
+    let tmux_location_map: HashMap<String, (String, String, String)> =
+        String::from_utf8_lossy(&tmux_ls_output.stdout)
+            .lines()
+            .filter_map(|s| {
+                let segs: Vec<&str> = s.split_whitespace().collect();
+                segs[3].strip_prefix("/dev/").map(|stripped_tty| {
+                    return (
+                        stripped_tty.to_string(),
+                        (
+                            segs[0].to_string(),
+                            segs[1].to_string(),
+                            segs[2].to_string(),
+                        ),
+                    );
+                })
+            })
+            .collect();
     let output = tokio::process::Command::new("pgrep")
         .args(["-x", "claude"])
         .output()
@@ -101,7 +176,9 @@ async fn get_claude_code_locations() -> anyhow::Result<()> {
             .args(["-p", pid, "-o", "tty="])
             .output()
             .await?;
-        let tty = String::from_utf8_lossy(&tty_output.stdout).trim().to_string();
+        let tty = String::from_utf8_lossy(&tty_output.stdout)
+            .trim()
+            .to_string();
         let cwd_output = tokio::process::Command::new("sh")
             .args(["-c", &format!("lsof -p {} | grep cwd", pid)])
             .output()
@@ -113,28 +190,25 @@ async fn get_claude_code_locations() -> anyhow::Result<()> {
             .and_then(|line| line.split_whitespace().last())
             .map(|s| s.to_string());
 
-        println!("Claude Code session pid {} on tty {:?}, cwd: {:?}", pid, tty, cwd.unwrap_or("<n/a>".to_string()));
+        if let (Some(tmux_location), Some(cwd)) = (tmux_location_map.get(&tty), cwd) {
+            let session = AgentSessionInfo::new(
+                Agent::ClaudeCode,
+                cwd,
+                tty,
+                pid.to_string(),
+                TmuxLocation::new(
+                    tmux_location.0.to_string(),
+                    tmux_location.1.to_string(),
+                    tmux_location.2.to_string(),
+                ),
+            );
+            println!("Session info: {:?}", session);
+        } else {
+            eprintln!(
+                "Can't gather enough information for {:?} session on pid {pid}",
+                Agent::ClaudeCode
+            );
+        }
     }
-    let tmux_ls_output = tokio::process::Command::new("tmux")
-        .args([
-            "list-panes",
-            "-a",
-            "-F",
-            "#{session_id} #{pane_id} #{pane_tty}",
-        ])
-        .output()
-        .await?;
-    let tmux_ls: Vec<(String, String, String)> = String::from_utf8_lossy(&tmux_ls_output.stdout)
-        .lines()
-        .map(|s| {
-            let segs: Vec<&str> = s.split_whitespace().collect();
-            (
-                segs[0].to_string(),
-                segs[1].to_string(),
-                segs[2].to_string(),
-            )
-        })
-        .collect();
-    println!("tmux list-panes info {:?}", tmux_ls);
     Ok(())
 }
