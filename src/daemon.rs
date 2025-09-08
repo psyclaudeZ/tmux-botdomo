@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
+use tokio::time::{self, Duration};
 
 use clap::{Parser, Subcommand};
 
@@ -106,8 +107,8 @@ async fn start_daemon() -> anyhow::Result<()> {
     // TODO: error handling
     let listener = UnixListener::bind(socket_path).unwrap();
     let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let mut main_loop_interval = time::interval(Duration::from_secs(10));
 
-    get_claude_code_locations().await?;
     loop {
         tokio::select! {
             Ok((mut stream, _)) = listener.accept() => {
@@ -116,6 +117,10 @@ async fn start_daemon() -> anyhow::Result<()> {
                 // TODO: error handling
                 stream.read_to_string(&mut buffer).await?;
                 println!("Received {buffer}");
+            }
+            _ = main_loop_interval.tick() => {
+                // TODO: state management
+                get_claude_code_locations().await?;
             }
             _ = tokio::signal::ctrl_c() => {
                 println!("Received SIGINT, shutting down...");
