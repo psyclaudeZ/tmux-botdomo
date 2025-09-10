@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::io::AsyncReadExt;
-use tokio::net::UnixListener;
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
 
 use clap::{Parser, Subcommand};
@@ -108,19 +110,23 @@ async fn start_daemon() -> anyhow::Result<()> {
     let listener = UnixListener::bind(socket_path).unwrap();
     let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     let mut main_loop_interval = time::interval(Duration::from_secs(10));
+    let session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>> =
+        Arc::new(RwLock::new(HashMap::new()));
 
     loop {
         tokio::select! {
-            Ok((mut stream, _)) = listener.accept() => {
-                // TODO: actual buffer read
-                let mut buffer = String::new();
-                // TODO: error handling
-                stream.read_to_string(&mut buffer).await?;
-                println!("Received {buffer}");
+            Ok((stream, _)) = listener.accept() => {
+                let session_info_clone = session_info.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handle_connection(stream, session_info_clone).await {
+                        eprintln!("Connect error {e}");
+                    };
+                });
             }
             _ = main_loop_interval.tick() => {
                 // TODO: state management
-                get_claude_code_locations().await?;
+                let session_info_clone = session_info.clone();
+                get_claude_code_locations(session_info_clone).await?;
             }
             _ = tokio::signal::ctrl_c() => {
                 println!("Received SIGINT, shutting down...");
@@ -136,11 +142,33 @@ async fn start_daemon() -> anyhow::Result<()> {
     Ok(())
 }
 
+async fn handle_connection(
+    mut stream: UnixStream,
+    session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+) -> anyhow::Result<()> {
+    // TODO: actual buffer read
+    let mut buffer = String::new();
+    if let Err(e) = stream.read_to_string(&mut buffer).await {
+        eprintln!("Failed to read from client connection {e}");
+        return Err(e.into());
+    }
+    println!("Received {buffer}");
+    let sessions = session_info.read().await;
+    if let Some(session) = sessions.get(&buffer) {
+        println!("Found session {:?}", session);
+    } else {
+        println!("No agent session found for key {buffer}");
+    }
+    Ok(())
+}
+
 async fn stop_daemon() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn get_claude_code_locations() -> anyhow::Result<()> {
+async fn get_claude_code_locations(
+    session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+) -> anyhow::Result<()> {
     // TODO: clean up, consolidate, etc.
     let tmux_ls_output = tokio::process::Command::new("tmux")
         .args([
@@ -198,7 +226,7 @@ async fn get_claude_code_locations() -> anyhow::Result<()> {
         if let (Some(tmux_location), Some(cwd)) = (tmux_location_map.get(&tty), cwd) {
             let session = AgentSessionInfo::new(
                 Agent::ClaudeCode,
-                cwd,
+                cwd.clone(),
                 tty,
                 pid.to_string(),
                 TmuxLocation::new(
@@ -207,7 +235,13 @@ async fn get_claude_code_locations() -> anyhow::Result<()> {
                     tmux_location.2.to_string(),
                 ),
             );
-            println!("Session info: {:?}", session);
+            // Scope for the write lock
+            // TODO: what if there're two sessions under the same cwd?
+            {
+                let mut writable_session_info = session_info.write().await;
+                writable_session_info.insert(cwd.clone(), session);
+            }
+            println!("Inserted session info for {}", cwd);
         } else {
             eprintln!(
                 "Can't gather enough information for {:?} session on pid {pid}",
