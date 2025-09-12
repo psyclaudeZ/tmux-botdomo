@@ -8,7 +8,7 @@ use tokio::time::{self, Duration};
 
 use clap::{Parser, Subcommand};
 
-use tmux_botdomo::common::get_socket_path;
+use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
 
 #[derive(Parser)]
 #[command(name = "tbdmd")]
@@ -35,20 +35,20 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-struct SocketGuard {
+struct FileGuard {
     path: PathBuf,
 }
 
-impl SocketGuard {
-    fn new(path: PathBuf) -> SocketGuard {
+impl FileGuard {
+    fn new(path: PathBuf) -> FileGuard {
         Self { path }
     }
 }
 
-impl Drop for SocketGuard {
+impl Drop for FileGuard {
     fn drop(&mut self) {
-        println!("Cleaning up socket file.");
         let _ = std::fs::remove_file(&self.path);
+        println!("Cleaned up file {}.", self.path.to_string_lossy());
     }
 }
 
@@ -104,8 +104,19 @@ impl AgentSessionInfo {
 async fn start_daemon() -> anyhow::Result<()> {
     println!("Starting daemon...");
     // TODO: check instance, socket
+    let pid_path = PathBuf::from(get_pid_file_path());
+    if pid_path.exists() {
+        if let Ok(pid) = std::fs::read_to_string(&pid_path) {
+            eprintln!("Daemon already running on PID {pid}.");
+        }
+        // TODO: stop command
+        eprintln!("Remove {} to stop the daemon manually.", pid_path.to_string_lossy());
+        std::process::exit(1);
+    } 
+    let _ = std::fs::write(&pid_path, std::process::id().to_string());
+    let _pid_guard = FileGuard::new(pid_path);
     let socket_path = PathBuf::from(get_socket_path());
-    let _socket_guard = SocketGuard::new(socket_path.clone());
+    let _socket_guard = FileGuard::new(socket_path.clone());
     // TODO: error handling
     let listener = UnixListener::bind(socket_path).unwrap();
     let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
