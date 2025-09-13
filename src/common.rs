@@ -2,7 +2,10 @@ pub const TMUX_BOTDOMO_SOCK_PATH: &str = "/tmp/tmux-botdomo.sock";
 
 pub fn get_pid_file_path() -> String {
     // TODO: XDG_RUNTIME_DIR?
-    format!("/tmp/tmux-botdomo-{}.pid", std::env::var("USER").unwrap_or_else(|_| "unknown".to_string()))
+    format!(
+        "/tmp/tmux-botdomo-{}.pid",
+        std::env::var("USER").unwrap_or_else(|_| "unknown".to_string())
+    )
 }
 
 pub fn get_socket_path() -> String {

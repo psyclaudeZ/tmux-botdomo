@@ -110,9 +110,12 @@ async fn start_daemon() -> anyhow::Result<()> {
             eprintln!("Daemon already running on PID {pid}.");
         }
         // TODO: stop command
-        eprintln!("Remove {} to stop the daemon manually.", pid_path.to_string_lossy());
+        eprintln!(
+            "Remove {} to stop the daemon manually.",
+            pid_path.to_string_lossy()
+        );
         std::process::exit(1);
-    } 
+    }
     let _ = std::fs::write(&pid_path, std::process::id().to_string());
     let _pid_guard = FileGuard::new(pid_path);
     let socket_path = PathBuf::from(get_socket_path());
