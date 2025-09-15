@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub enum ClientMessage {
+pub enum CliRequest {
     Send { cwd: String, context: String },
 }

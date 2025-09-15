@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
 
 use serde_json;
 use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
-use tmux_botdomo::messages::ClientMessage;
+use tmux_botdomo::messages::CliRequest;
 
 #[derive(Parser)]
 #[command(name = "tbdmd")]
@@ -171,20 +171,28 @@ async fn handle_connection(
     println!("Received {buffer}");
 
     match serde_json::from_str(&buffer) {
-        Ok(ClientMessage::Send { cwd, context }) => {
+        Ok(CliRequest::Send { cwd, context }) => {
             println!("Received cwd: {:?} context: {:?}", cwd, context);
-            let sessions = session_info.read().await;
-            if let Some(session) = sessions.get(&cwd) {
-                println!("Found session {:?}", session);
-            } else {
-                println!("No agent session found for key {buffer}");
-            }
+            let _ = handle_send(session_info, &cwd).await?;
         }
         Err(e) => {
             eprintln!("Error parsing the data received from the client: {e}");
             return Err(e.into());
         }
     };
+    Ok(())
+}
+
+async fn handle_send(
+    session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+    cwd: &str,
+) -> anyhow::Result<()> {
+    let sessions = session_info.read().await;
+    if let Some(session) = sessions.get(cwd) {
+        println!("Found session {:?}", session);
+    } else {
+        println!("No agent session found for cwd {cwd}");
+    }
     Ok(())
 }
 

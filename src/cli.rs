@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use serde_json;
 use tmux_botdomo::common::{get_socket_path, get_tmux_session_id};
-use tmux_botdomo::messages::ClientMessage;
+use tmux_botdomo::messages::CliRequest;
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 
 #[derive(Parser)]
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
                 .ok()
                 .map(|s| s.to_string_lossy().to_string());
             if let Some(cwd) = cwd {
-                let request = ClientMessage::Send { cwd, context };
+                let request = CliRequest::Send { cwd, context };
                 let request_json = serde_json::to_string(&request)?;
                 // TODO: error handling
                 let mut stream = UnixStream::connect(get_socket_path()).await.unwrap();
