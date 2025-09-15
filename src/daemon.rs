@@ -8,7 +8,9 @@ use tokio::time::{self, Duration};
 
 use clap::{Parser, Subcommand};
 
+use serde_json;
 use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
+use tmux_botdomo::messages::ClientMessage;
 
 #[derive(Parser)]
 #[command(name = "tbdmd")]
@@ -167,12 +169,22 @@ async fn handle_connection(
         return Err(e.into());
     }
     println!("Received {buffer}");
-    let sessions = session_info.read().await;
-    if let Some(session) = sessions.get(&buffer) {
-        println!("Found session {:?}", session);
-    } else {
-        println!("No agent session found for key {buffer}");
-    }
+
+    match serde_json::from_str(&buffer) {
+        Ok(ClientMessage::Send { cwd, context }) => {
+            println!("Received cwd: {:?} context: {:?}", cwd, context);
+            let sessions = session_info.read().await;
+            if let Some(session) = sessions.get(&cwd) {
+                println!("Found session {:?}", session);
+            } else {
+                println!("No agent session found for key {buffer}");
+            }
+        }
+        Err(e) => {
+            eprintln!("Error parsing the data received from the client: {e}");
+            return Err(e.into());
+        }
+    };
     Ok(())
 }
 

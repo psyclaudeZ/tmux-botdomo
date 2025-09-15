@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
-use serde::{Deserialize, Serialize};
-use tmux_botdomo::common::{get_socket_path, get_tmux_session_id};
-use tokio::{io::AsyncWriteExt, net::UnixStream};
 use serde_json;
+use tmux_botdomo::common::{get_socket_path, get_tmux_session_id};
+use tmux_botdomo::messages::ClientMessage;
+use tokio::{io::AsyncWriteExt, net::UnixStream};
 
 #[derive(Parser)]
 #[command(name = "tbdm")]
@@ -14,11 +14,6 @@ struct Args {
 #[derive(Subcommand)]
 enum Command {
     Send { context: String },
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum ClientMessage {
-    Send { cwd: String, context: String },
 }
 
 #[tokio::main]
@@ -34,12 +29,11 @@ async fn main() -> anyhow::Result<()> {
 
     match args.command {
         Command::Send { context } => {
-            let cwd = std::env::current_dir().ok().map(|s| s.to_string_lossy().to_string());
+            let cwd = std::env::current_dir()
+                .ok()
+                .map(|s| s.to_string_lossy().to_string());
             if let Some(cwd) = cwd {
-                let request = ClientMessage::Send {
-                    cwd,
-                    context,
-                };
+                let request = ClientMessage::Send { cwd, context };
                 let request_json = serde_json::to_string(&request)?;
                 // TODO: error handling
                 let mut stream = UnixStream::connect(get_socket_path()).await.unwrap();
