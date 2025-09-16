@@ -1,16 +1,15 @@
+use clap::{Parser, Subcommand};
+use nix::sys::signal;
+use nix::unistd::Pid;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
+use tmux_botdomo::messages::CliRequest;
 use tokio::io::AsyncReadExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
-
-use clap::{Parser, Subcommand};
-
-use serde_json;
-use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
-use tmux_botdomo::messages::CliRequest;
 
 #[derive(Parser)]
 #[command(name = "tbdmd")]
@@ -197,6 +196,13 @@ async fn handle_send(
 }
 
 async fn stop_daemon() -> anyhow::Result<()> {
+    let pid_path = PathBuf::from(get_pid_file_path());
+    if !pid_path.exists() {
+        eprintln!("Daemon not running (no PID file)");
+        std::process::exit(1);
+    }
+    let pid: i32 = std::fs::read_to_string(&pid_path)?.trim().parse()?;
+    let _ = signal::kill(Pid::from_raw(pid), signal::SIGTERM);
     Ok(())
 }
 
