@@ -1,12 +1,13 @@
 use clap::{Parser, Subcommand};
 use nix::sys::signal;
 use nix::unistd::Pid;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
-use tmux_botdomo::messages::CliRequest;
-use tokio::io::{BufReader, AsyncBufReadExt};
+use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus};
+use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
@@ -53,12 +54,12 @@ impl Drop for FileGuard {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 enum Agent {
     ClaudeCode,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 struct TmuxLocation {
     session_id: String,
     window_id: String,
@@ -75,7 +76,7 @@ impl TmuxLocation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 struct AgentSessionInfo {
     agent: Agent,
     cwd: String,
@@ -169,30 +170,55 @@ async fn handle_connection(
     }
     println!("Received {buffer}");
 
-    match serde_json::from_str(&buffer) {
+    let response = match serde_json::from_str(&buffer) {
         Ok(CliRequest::Send { cwd, context }) => {
             println!("Received cwd: {:?} context: {:?}", cwd, context);
-            let _ = handle_send(session_info, &cwd).await?;
+            handle_send(session_info, &cwd).await?
         }
         Err(e) => {
             eprintln!("Error parsing the data received from the client: {e}");
-            return Err(e.into());
+            DaemonResponse {
+                status: ResponseStatus::Failure,
+                message: Some("Error parsing the data received from the client".to_string()),
+                payload: None,
+            }
         }
     };
+    println!("{:?}", response);
+    let response_json = serde_json::to_string(&response)?;
+    // \n is necessary for read_line
+    stream.write_all(format!("{}\n", response_json).as_bytes()).await?;
     Ok(())
 }
 
 async fn handle_send(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
     cwd: &str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<DaemonResponse> {
     let sessions = session_info.read().await;
     if let Some(session) = sessions.get(cwd) {
         println!("Found session {:?}", session);
+        if let Ok(serialized) = serde_json::to_value(session) {
+            Ok(DaemonResponse {
+                status: ResponseStatus::Success,
+                payload: Some(serialized),
+                message: Some("Session found".to_string()),
+            })
+        } else {
+            Ok(DaemonResponse {
+                status: ResponseStatus::Failure,
+                payload: None,
+                message: Some("Session found but failed to serialize the payload".to_string()),
+            })
+        }
     } else {
         println!("No agent session found for cwd {cwd}");
+        Ok(DaemonResponse {
+            status: ResponseStatus::Failure,
+            payload: None,
+            message: Some(format!("No session found for cwd {cwd}")),
+        })
     }
-    Ok(())
 }
 
 async fn stop_daemon() -> anyhow::Result<()> {
