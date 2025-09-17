@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
 use tmux_botdomo::messages::CliRequest;
-use tokio::io::AsyncReadExt;
+use tokio::io::{BufReader, AsyncBufReadExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
@@ -161,9 +161,9 @@ async fn handle_connection(
     mut stream: UnixStream,
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
 ) -> anyhow::Result<()> {
-    // TODO: actual buffer read
+    let mut reader = BufReader::new(&mut stream);
     let mut buffer = String::new();
-    if let Err(e) = stream.read_to_string(&mut buffer).await {
+    if let Err(e) = reader.read_line(&mut buffer).await {
         eprintln!("Failed to read from client connection {e}");
         return Err(e.into());
     }
