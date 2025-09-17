@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
 use tmux_botdomo::messages::CliRequest;
-use tokio::io::{AsyncReadExt, BufReader, AsyncBufReadExt};
+use tokio::io::{BufReader, AsyncBufReadExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
