@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
-use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus};
-use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
+use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
+use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
@@ -162,14 +162,7 @@ async fn handle_connection(
     mut stream: UnixStream,
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
 ) -> anyhow::Result<()> {
-    let mut reader = BufReader::new(&mut stream);
-    let mut buffer = String::new();
-    if let Err(e) = reader.read_line(&mut buffer).await {
-        eprintln!("Failed to read from client connection {e}");
-        return Err(e.into());
-    }
-    println!("Received {buffer}");
-
+    let buffer = read_from_stream(&mut stream).await?;
     let response = match serde_json::from_str(&buffer) {
         Ok(CliRequest::Send { cwd, context }) => {
             println!("Received cwd: {:?} context: {:?}", cwd, context);
@@ -187,7 +180,9 @@ async fn handle_connection(
     println!("{:?}", response);
     let response_json = serde_json::to_string(&response)?;
     // \n is necessary for read_line
-    stream.write_all(format!("{}\n", response_json).as_bytes()).await?;
+    stream
+        .write_all(format!("{}\n", response_json).as_bytes())
+        .await?;
     Ok(())
 }
 

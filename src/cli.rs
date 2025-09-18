@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
 use serde_json;
 use tmux_botdomo::common::{get_socket_path, get_tmux_session_id};
-use tmux_botdomo::messages::{CliRequest, DaemonResponse};
-use tokio::io::{BufReader, AsyncBufReadExt};
+use tmux_botdomo::messages::{CliRequest, DaemonResponse, read_from_stream};
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 
 #[derive(Parser)]
@@ -47,14 +46,20 @@ async fn main() -> anyhow::Result<()> {
 
 async fn send_to_daemon(request: CliRequest) -> anyhow::Result<()> {
     let request_json = serde_json::to_string(&request)?;
-    // TODO: error handling
-    let mut stream = UnixStream::connect(get_socket_path()).await.unwrap();
+    let mut stream = match UnixStream::connect(get_socket_path()).await {
+        Ok(stream) => stream,
+        Err(_) => {
+            return Err(anyhow::anyhow!(
+                "Failed to connect to a daemon. Is the daemon running?"
+            ));
+        }
+    };
     // \n is necessary for read_line
-    stream.write_all(format!("{}\n",request_json).as_bytes()).await?;
+    stream
+        .write_all(format!("{}\n", request_json).as_bytes())
+        .await?;
 
-    let mut reader = BufReader::new(&mut stream);
-    let mut buffer= String::new();
-    reader.read_line(&mut buffer).await?;
+    let buffer = read_from_stream(&mut stream).await?;
     let response: DaemonResponse = serde_json::from_str(&buffer.trim())?;
     println!("Received response {:?}", response);
     Ok(())
