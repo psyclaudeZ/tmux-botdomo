@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use serde_json;
-use tmux_botdomo::common::{get_socket_path, get_tmux_session_id};
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, read_from_stream};
+use tmux_botdomo::unix::{get_socket_path, get_tmux_session_id};
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 
 #[derive(Parser)]
