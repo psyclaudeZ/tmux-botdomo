@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tmux_botdomo::common::{get_pid_file_path, get_socket_path};
+use tmux_botdomo::unix::{get_pid_file_path, get_socket_path};
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
