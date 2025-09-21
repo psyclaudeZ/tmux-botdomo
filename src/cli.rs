@@ -20,7 +20,6 @@ enum Command {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    //TODO: logger
     if let Some(session_id) = get_tmux_session_id() {
         println!("Running inside tmux session {session_id}");
     } else {
