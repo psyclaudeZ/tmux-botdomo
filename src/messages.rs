@@ -28,6 +28,5 @@ pub async fn read_from_stream(stream: &mut UnixStream) -> anyhow::Result<String>
         eprintln!("Failed to read from client connection {e}");
         return Err(e.into());
     }
-    println!("Received {buffer}");
     Ok(buffer)
 }

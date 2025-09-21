@@ -3,8 +3,10 @@ use nix::sys::signal;
 use nix::unistd::Pid;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tmux_botdomo::logger::{print_debug, print_error, print_info};
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
 use tmux_botdomo::unix::{get_pid_file_path, get_socket_path};
 use tokio::io::AsyncWriteExt;
@@ -50,7 +52,7 @@ impl FileGuard {
 impl Drop for FileGuard {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.path);
-        println!("Cleaned up file {}.", self.path.to_string_lossy());
+        print_info(&format!("Cleaned up file {}.", self.path.to_string_lossy()));
     }
 }
 
@@ -104,18 +106,22 @@ impl AgentSessionInfo {
 }
 
 async fn start_daemon() -> anyhow::Result<()> {
-    println!("Starting daemon...");
+    env_logger::Builder::new()
+        .format(|buf, record| writeln!(buf, "{}", record.args()))
+        .filter_level(log::LevelFilter::Debug)
+        .init();
+
+    print_info("Starting daemon...");
     // TODO: check instance, socket
     let pid_path = PathBuf::from(get_pid_file_path());
     if pid_path.exists() {
         if let Ok(pid) = std::fs::read_to_string(&pid_path) {
-            eprintln!("Daemon already running on PID {pid}.");
+            print_error(&format!("Daemon already running on PID {pid}."));
         }
-        // TODO: stop command
-        eprintln!(
+        print_error(&format!(
             "Remove {} to stop the daemon manually.",
             pid_path.to_string_lossy()
-        );
+        ));
         std::process::exit(1);
     }
     let _ = std::fs::write(&pid_path, std::process::id().to_string());
@@ -135,7 +141,7 @@ async fn start_daemon() -> anyhow::Result<()> {
                 let session_info_clone = session_info.clone();
                 tokio::spawn(async move {
                     if let Err(e) = handle_connection(stream, session_info_clone).await {
-                        eprintln!("Connect error {e}");
+                        print_error(&format!("Connect error {e}"));
                     };
                 });
             }
@@ -145,11 +151,11 @@ async fn start_daemon() -> anyhow::Result<()> {
                 get_claude_code_locations(session_info_clone).await?;
             }
             _ = tokio::signal::ctrl_c() => {
-                println!("Received SIGINT, shutting down...");
+                print_info("Received SIGINT, shutting down...");
                 break;
             }
             _ = sigterm.recv() => {
-                println!("Received SIGTERM, shutting down...");
+                print_info("Received SIGTERM, shutting down...");
                 break;
             }
         }
@@ -163,13 +169,16 @@ async fn handle_connection(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
 ) -> anyhow::Result<()> {
     let buffer = read_from_stream(&mut stream).await?;
+    print_debug(&format!("Received {buffer}"));
     let response = match serde_json::from_str(&buffer) {
         Ok(CliRequest::Send { cwd, context }) => {
-            println!("Received cwd: {:?} context: {:?}", cwd, context);
+            print_info(&format!("Received cwd: {:?} context: {:?}", cwd, context));
             handle_send(session_info, &cwd).await?
         }
         Err(e) => {
-            eprintln!("Error parsing the data received from the client: {e}");
+            print_error(&format!(
+                "Error parsing the data received from the client: {e}"
+            ));
             DaemonResponse {
                 status: ResponseStatus::Failure,
                 message: Some("Error parsing the data received from the client".to_string()),
@@ -177,7 +186,7 @@ async fn handle_connection(
             }
         }
     };
-    println!("{:?}", response);
+    print_info(&format!("{:?}", response));
     let response_json = serde_json::to_string(&response)?;
     // \n is necessary for read_line
     stream
@@ -192,7 +201,7 @@ async fn handle_send(
 ) -> anyhow::Result<DaemonResponse> {
     let sessions = session_info.read().await;
     if let Some(session) = sessions.get(cwd) {
-        println!("Found session {:?}", session);
+        print_info(&format!("Found session {:?}", session));
         if let Ok(serialized) = serde_json::to_value(session) {
             Ok(DaemonResponse {
                 status: ResponseStatus::Success,
@@ -207,7 +216,7 @@ async fn handle_send(
             })
         }
     } else {
-        println!("No agent session found for cwd {cwd}");
+        print_info(&format!("No agent session found for cwd {cwd}"));
         Ok(DaemonResponse {
             status: ResponseStatus::Failure,
             payload: None,
@@ -219,7 +228,7 @@ async fn handle_send(
 async fn stop_daemon() -> anyhow::Result<()> {
     let pid_path = PathBuf::from(get_pid_file_path());
     if !pid_path.exists() {
-        eprintln!("Daemon not running (no PID file)");
+        print_error(&format!("Daemon not running (no PID file)"));
         std::process::exit(1);
     }
     let pid: i32 = std::fs::read_to_string(&pid_path)?.trim().parse()?;
@@ -302,12 +311,12 @@ async fn get_claude_code_locations(
                 let mut writable_session_info = session_info.write().await;
                 writable_session_info.insert(cwd.clone(), session);
             }
-            println!("Inserted session info for {}", cwd);
+            print_info(&format!("Inserted session info for {}", cwd));
         } else {
-            eprintln!(
+            print_error(&format!(
                 "Can't gather enough information for {:?} session on pid {pid}",
                 Agent::ClaudeCode
-            );
+            ));
         }
     }
     Ok(())
