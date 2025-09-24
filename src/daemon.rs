@@ -1,13 +1,13 @@
 use clap::{Parser, Subcommand};
 use nix::sys::signal;
 use nix::unistd::Pid;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tmux_botdomo::logger::{print_debug, print_error, print_info};
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
+use tmux_botdomo::session::{Agent, AgentSessionInfo, TmuxLocation};
 use tmux_botdomo::unix::{get_pid_file_path, get_socket_path};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
@@ -53,55 +53,6 @@ impl Drop for FileGuard {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.path);
         print_info(&format!("Cleaned up file {}.", self.path.to_string_lossy()));
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-enum Agent {
-    ClaudeCode,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct TmuxLocation {
-    session_id: String,
-    window_id: String,
-    pane_id: String,
-}
-
-impl TmuxLocation {
-    fn new(session_id: String, window_id: String, pane_id: String) -> Self {
-        Self {
-            session_id,
-            window_id,
-            pane_id,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct AgentSessionInfo {
-    agent: Agent,
-    cwd: String,
-    pane_tty: String,
-    pid: String,
-    tmux_location: TmuxLocation,
-}
-
-impl AgentSessionInfo {
-    fn new(
-        agent: Agent,
-        cwd: String,
-        pane_tty: String,
-        pid: String,
-        tmux_location: TmuxLocation,
-    ) -> Self {
-        Self {
-            agent,
-            cwd,
-            pane_tty,
-            pid,
-            tmux_location,
-        }
     }
 }
 

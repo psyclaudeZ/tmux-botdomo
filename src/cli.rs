@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use serde_json;
+use std::collections::HashMap;
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
+use tmux_botdomo::session::AgentSessionInfo;
 use tmux_botdomo::unix::{get_socket_path, get_tmux_session_id};
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 
@@ -43,7 +45,14 @@ async fn main() -> anyhow::Result<()> {
             let request = CliRequest::Status;
             let response = send_to_daemon(request).await?;
             if response.status == ResponseStatus::Success {
-                println!("{}", response.payload.unwrap());
+                let session_info: HashMap<String, AgentSessionInfo> =
+                    serde_json::from_value(response.payload.unwrap())?;
+                for (i, (cwd, session)) in session_info.iter().enumerate() {
+                    println!(
+                        "Session #{i} - Agent: {}, cwd: {cwd}, pid: {}, tmux location: {}",
+                        session.agent, session.pid, session.tmux_location,
+                    );
+                }
             } else {
                 eprintln!(
                     "Failed to request status: {}",
