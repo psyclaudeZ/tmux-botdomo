@@ -3,7 +3,7 @@ use serde_json;
 use std::collections::HashMap;
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
 use tmux_botdomo::session::AgentSessionInfo;
-use tmux_botdomo::unix::{get_socket_path, get_tmux_session_id};
+use tmux_botdomo::unix::get_socket_path;
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 
 #[derive(Parser)]
@@ -22,12 +22,6 @@ enum Command {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-
-    if let Some(session_id) = get_tmux_session_id() {
-        println!("Running inside tmux session {session_id}");
-    } else {
-        eprintln!("No tmux session detected. The command should be running inside one");
-    }
 
     match args.command {
         Command::Send { context } => {
