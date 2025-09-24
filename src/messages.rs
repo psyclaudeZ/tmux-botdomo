@@ -6,9 +6,10 @@ use tokio::net::UnixStream;
 #[derive(Serialize, Deserialize)]
 pub enum CliRequest {
     Send { cwd: String, context: String },
+    Status,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum ResponseStatus {
     Success,
     Failure,

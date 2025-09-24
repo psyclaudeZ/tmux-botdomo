@@ -175,6 +175,22 @@ async fn handle_connection(
             print_info(&format!("Received cwd: {:?} context: {:?}", cwd, context));
             handle_send(session_info, &cwd).await?
         }
+        Ok(CliRequest::Status) => {
+            let sessions = session_info.read().await;
+            if let Ok(serialized) = serde_json::to_value(&*sessions) {
+                DaemonResponse {
+                    status: ResponseStatus::Success,
+                    payload: Some(serialized),
+                    message: None,
+                }
+            } else {
+                DaemonResponse {
+                    status: ResponseStatus::Failure,
+                    payload: None,
+                    message: Some("Error parsing the session information".to_string()),
+                }
+            }
+        }
         Err(e) => {
             print_error(&format!(
                 "Error parsing the data received from the client: {e}"
