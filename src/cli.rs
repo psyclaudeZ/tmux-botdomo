@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use serde_json;
-use tmux_botdomo::messages::{read_from_stream, CliRequest, DaemonResponse, ResponseStatus};
+use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
 use tmux_botdomo::unix::{get_socket_path, get_tmux_session_id};
 use tokio::{io::AsyncWriteExt, net::UnixStream};
 
@@ -45,7 +45,10 @@ async fn main() -> anyhow::Result<()> {
             if response.status == ResponseStatus::Success {
                 println!("{}", response.payload.unwrap());
             } else {
-                eprintln!("Failed to request status: {}", response.message.unwrap_or("".to_string()));
+                eprintln!(
+                    "Failed to request status: {}",
+                    response.message.unwrap_or("".to_string())
+                );
             }
         }
     }
