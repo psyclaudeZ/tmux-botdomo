@@ -123,7 +123,7 @@ async fn handle_connection(
     print_debug(&format!("Received {buffer}"));
     let response = match serde_json::from_str(&buffer) {
         Ok(CliRequest::Send { cwd, context }) => {
-            print_info(&format!("Received cwd: {:?} context: {:?}", cwd, context));
+            print_info(&format!("Received cwd: {cwd:?} context: {context:?}"));
             handle_send(session_info, &cwd).await?
         }
         Ok(CliRequest::Status) => {
@@ -153,11 +153,11 @@ async fn handle_connection(
             }
         }
     };
-    print_info(&format!("{:?}", response));
+    print_info(&format!("{response:?}"));
     let response_json = serde_json::to_string(&response)?;
     // \n is necessary for read_line
     stream
-        .write_all(format!("{}\n", response_json).as_bytes())
+        .write_all(format!("{response_json}\n").as_bytes())
         .await?;
     Ok(())
 }
@@ -168,7 +168,7 @@ async fn handle_send(
 ) -> anyhow::Result<DaemonResponse> {
     let sessions = session_info.read().await;
     if let Some(session) = sessions.get(cwd) {
-        print_info(&format!("Found session {:?}", session));
+        print_info(&format!("Found session {session:?}"));
         if let Ok(serialized) = serde_json::to_value(session) {
             Ok(DaemonResponse {
                 status: ResponseStatus::Success,
@@ -195,7 +195,7 @@ async fn handle_send(
 async fn stop_daemon() -> anyhow::Result<()> {
     let pid_path = PathBuf::from(get_pid_file_path());
     if !pid_path.exists() {
-        print_error(&format!("Daemon not running (no PID file)"));
+        print_error("Daemon not running (no PID file)");
         std::process::exit(1);
     }
     let pid: i32 = std::fs::read_to_string(&pid_path)?.trim().parse()?;
@@ -222,14 +222,14 @@ async fn get_claude_code_locations(
             .filter_map(|s| {
                 let segs: Vec<&str> = s.split_whitespace().collect();
                 segs[3].strip_prefix("/dev/").map(|stripped_tty| {
-                    return (
+                    (
                         stripped_tty.to_string(),
                         (
                             segs[0].to_string(),
                             segs[1].to_string(),
                             segs[2].to_string(),
                         ),
-                    );
+                    )
                 })
             })
             .collect();
@@ -250,7 +250,7 @@ async fn get_claude_code_locations(
             .trim()
             .to_string();
         let cwd_output = tokio::process::Command::new("sh")
-            .args(["-c", &format!("lsof -p {} | grep cwd", pid)])
+            .args(["-c", &format!("lsof -p {pid} | grep cwd")])
             .output()
             .await?;
 
@@ -278,7 +278,7 @@ async fn get_claude_code_locations(
                 let mut writable_session_info = session_info.write().await;
                 writable_session_info.insert(cwd.clone(), session);
             }
-            print_info(&format!("Inserted session info for {}", cwd));
+            print_info(&format!("Detected session for {cwd}"));
         } else {
             print_error(&format!(
                 "Can't gather enough information for {:?} session on pid {pid}",
