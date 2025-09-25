@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use serde_json;
 use std::collections::HashMap;
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
 use tmux_botdomo::session::AgentSessionInfo;
@@ -71,10 +70,10 @@ async fn send_to_daemon(request: CliRequest) -> anyhow::Result<DaemonResponse> {
     };
     // \n is necessary for read_line
     stream
-        .write_all(format!("{}\n", request_json).as_bytes())
+        .write_all(format!("{request_json}\n").as_bytes())
         .await?;
 
     let buffer = read_from_stream(&mut stream).await?;
-    let response: DaemonResponse = serde_json::from_str(&buffer.trim())?;
+    let response: DaemonResponse = serde_json::from_str(buffer.trim())?;
     Ok(response)
 }
