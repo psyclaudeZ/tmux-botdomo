@@ -10,7 +10,7 @@ pub fn print_error(msg: &str) {
 }
 
 pub fn print_debug(msg: &str) {
-    debug!("[{}] {}", log_prefix(), msg);
+    debug!("[{}] DEBUG {}", log_prefix(), msg);
 }
 
 fn log_prefix() -> impl std::fmt::Display {

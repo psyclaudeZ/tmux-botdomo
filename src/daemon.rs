@@ -58,8 +58,8 @@ impl Drop for FileGuard {
 
 async fn start_daemon() -> anyhow::Result<()> {
     env_logger::Builder::new()
-        .format(|buf, record| writeln!(buf, "{}", record.args()))
-        .filter_level(log::LevelFilter::Debug)
+        .format(|buf, record| write!(buf, "{}", record.args()))
+        .parse_default_env()
         .init();
 
     print_info("Starting daemon...");
