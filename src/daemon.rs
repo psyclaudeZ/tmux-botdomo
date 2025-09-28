@@ -177,26 +177,26 @@ async fn handle_send(
             session.tmux_location.pane_id
         );
         let res = tokio::process::Command::new("tmux")
-            .args(["send-keys", "-t", &pane_target, &context])
+            .args(["send-keys", "-t", &pane_target, context])
             .output()
             .await;
 
         match res {
             Ok(_) => {
-                return Ok(DaemonResponse {
+                Ok(DaemonResponse {
                     status: ResponseStatus::Success,
                     payload: None,
                     message: Some(format!("Relayed message to tmux location {pane_target}")),
-                });
+                })
             }
             Err(_) => {
-                return Ok(DaemonResponse {
+                Ok(DaemonResponse {
                     status: ResponseStatus::Failure,
                     payload: None,
                     message: Some(format!(
                         "Failed to relay message to tmux location {pane_target}"
                     )),
-                });
+                })
             }
         }
     } else {
