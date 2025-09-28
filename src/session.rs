@@ -16,9 +16,9 @@ impl fmt::Display for Agent {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TmuxLocation {
-    session_id: String,
-    window_id: String,
-    pane_id: String,
+    pub session_id: String,
+    pub window_id: String,
+    pub pane_id: String,
 }
 
 impl fmt::Display for TmuxLocation {

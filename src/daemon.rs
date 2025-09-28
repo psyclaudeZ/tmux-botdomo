@@ -124,7 +124,7 @@ async fn handle_connection(
     let response = match serde_json::from_str(&buffer) {
         Ok(CliRequest::Send { cwd, context }) => {
             print_info(&format!("Received cwd: {cwd:?} context: {context:?}"));
-            handle_send(session_info, &cwd).await?
+            handle_send(session_info, &cwd, &context).await?
         }
         Ok(CliRequest::Status) => {
             let sessions = session_info.read().await;
@@ -165,22 +165,39 @@ async fn handle_connection(
 async fn handle_send(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
     cwd: &str,
+    context: &str,
 ) -> anyhow::Result<DaemonResponse> {
     let sessions = session_info.read().await;
     if let Some(session) = sessions.get(cwd) {
         print_info(&format!("Found session {session:?}"));
-        if let Ok(serialized) = serde_json::to_value(session) {
-            Ok(DaemonResponse {
-                status: ResponseStatus::Success,
-                payload: Some(serialized),
-                message: Some("Session found".to_string()),
-            })
-        } else {
-            Ok(DaemonResponse {
-                status: ResponseStatus::Failure,
-                payload: None,
-                message: Some("Session found but failed to serialize the payload".to_string()),
-            })
+        let pane_target = format!(
+            "{}:{}.{}",
+            session.tmux_location.session_id,
+            session.tmux_location.window_id,
+            session.tmux_location.pane_id
+        );
+        let res = tokio::process::Command::new("tmux")
+            .args(["send-keys", "-t", &pane_target, context])
+            .output()
+            .await;
+
+        match res {
+            Ok(_) => {
+                Ok(DaemonResponse {
+                    status: ResponseStatus::Success,
+                    payload: None,
+                    message: Some(format!("Relayed message to tmux location {pane_target}")),
+                })
+            }
+            Err(_) => {
+                Ok(DaemonResponse {
+                    status: ResponseStatus::Failure,
+                    payload: None,
+                    message: Some(format!(
+                        "Failed to relay message to tmux location {pane_target}"
+                    )),
+                })
+            }
         }
     } else {
         print_info(&format!("No agent session found for cwd {cwd}"));
