@@ -204,7 +204,7 @@ async fn handle_send(
 }
 
 #[cfg(feature = "test-mode")]
-async fn relay_to_tmux(pane_target: &str, context: &str) -> anyhow::Result<Output> {
+async fn relay_to_tmux(_pane_target: &str, _context: &str) -> anyhow::Result<Output> {
     println!("Running in test mode. No messages is actually relayed.");
     Ok(Output {
         status: std::process::ExitStatus::default(),
