@@ -4,6 +4,7 @@ use nix::unistd::Pid;
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Output;
 use std::sync::Arc;
 use tmux_botdomo::logger::{print_debug, print_error, print_info};
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
@@ -176,28 +177,21 @@ async fn handle_send(
             session.tmux_location.window_id,
             session.tmux_location.pane_id
         );
-        let res = tokio::process::Command::new("tmux")
-            .args(["send-keys", "-t", &pane_target, context])
-            .output()
-            .await;
+        let res = relay_to_tmux(&pane_target, context).await;
 
         match res {
-            Ok(_) => {
-                Ok(DaemonResponse {
-                    status: ResponseStatus::Success,
-                    payload: None,
-                    message: Some(format!("Relayed message to tmux location {pane_target}")),
-                })
-            }
-            Err(_) => {
-                Ok(DaemonResponse {
-                    status: ResponseStatus::Failure,
-                    payload: None,
-                    message: Some(format!(
-                        "Failed to relay message to tmux location {pane_target}"
-                    )),
-                })
-            }
+            Ok(_) => Ok(DaemonResponse {
+                status: ResponseStatus::Success,
+                payload: None,
+                message: Some(format!("Relayed message to tmux location {pane_target}")),
+            }),
+            Err(_) => Ok(DaemonResponse {
+                status: ResponseStatus::Failure,
+                payload: None,
+                message: Some(format!(
+                    "Failed to relay message to tmux location {pane_target}"
+                )),
+            }),
         }
     } else {
         print_info(&format!("No agent session found for cwd {cwd}"));
@@ -207,6 +201,25 @@ async fn handle_send(
             message: Some(format!("No session found for cwd {cwd}")),
         })
     }
+}
+
+#[cfg(feature = "test-mode")]
+async fn relay_to_tmux(pane_target: &str, context: &str) -> anyhow::Result<Output> {
+    println!("Running in test mode. No messages is actually relayed.");
+    Ok(Output {
+        status: std::process::ExitStatus::default(),
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+    })
+}
+
+#[cfg(not(feature = "test-mode"))]
+async fn relay_to_tmux(pane_target: &str, context: &str) -> anyhow::Result<Output> {
+    tokio::process::Command::new("tmux")
+        .args(["send-keys", "-t", &pane_target, context])
+        .output()
+        .await
+        .map_err(anyhow::Error::from)
 }
 
 async fn stop_daemon() -> anyhow::Result<()> {
