@@ -216,7 +216,7 @@ async fn relay_to_tmux(_pane_target: &str, _context: &str) -> anyhow::Result<Out
 #[cfg(not(feature = "test-mode"))]
 async fn relay_to_tmux(pane_target: &str, context: &str) -> anyhow::Result<Output> {
     tokio::process::Command::new("tmux")
-        .args(["send-keys", "-t", &pane_target, context])
+        .args(["send-keys", "-t", pane_target, context])
         .output()
         .await
         .map_err(anyhow::Error::from)
