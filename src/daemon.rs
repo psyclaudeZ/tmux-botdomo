@@ -233,6 +233,15 @@ async fn stop_daemon() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "test-mode")]
+async fn get_claude_code_locations(
+    _session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+) -> anyhow::Result<()> {
+    print_info("Test mode: skipping Claude Code location detection");
+    Ok(())
+}
+
+#[cfg(not(feature = "test-mode"))]
 async fn get_claude_code_locations(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
 ) -> anyhow::Result<()> {
