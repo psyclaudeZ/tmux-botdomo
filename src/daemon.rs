@@ -216,7 +216,7 @@ async fn relay_to_tmux(_pane_target: &str, _context: &str) -> anyhow::Result<Out
 #[cfg(not(feature = "test-mode"))]
 async fn relay_to_tmux(pane_target: &str, context: &str) -> anyhow::Result<Output> {
     tokio::process::Command::new("tmux")
-        .args(["send-keys", "-t", &pane_target, context])
+        .args(["send-keys", "-t", pane_target, context])
         .output()
         .await
         .map_err(anyhow::Error::from)
@@ -233,6 +233,15 @@ async fn stop_daemon() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "test-mode")]
+async fn get_claude_code_locations(
+    _session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+) -> anyhow::Result<()> {
+    print_info("Test mode: skipping Claude Code location detection");
+    Ok(())
+}
+
+#[cfg(not(feature = "test-mode"))]
 async fn get_claude_code_locations(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
 ) -> anyhow::Result<()> {
