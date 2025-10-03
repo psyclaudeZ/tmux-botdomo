@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use nix::sys::signal;
 use nix::unistd::Pid;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Output;
@@ -100,7 +100,7 @@ async fn start_daemon() -> anyhow::Result<()> {
             _ = main_loop_interval.tick() => {
                 // TODO: state management
                 let session_info_clone = session_info.clone();
-                get_claude_code_locations(session_info_clone).await?;
+                get_agent_locations(session_info_clone).await?;
             }
             _ = tokio::signal::ctrl_c() => {
                 print_info("Received SIGINT, shutting down...");
@@ -234,15 +234,15 @@ async fn stop_daemon() -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "test-mode")]
-async fn get_claude_code_locations(
+async fn get_agent_locations(
     _session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
 ) -> anyhow::Result<()> {
-    print_info("Test mode: skipping Claude Code location detection");
+    print_info("Test mode: skipping agent location detection");
     Ok(())
 }
 
 #[cfg(not(feature = "test-mode"))]
-async fn get_claude_code_locations(
+async fn get_agent_locations(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
 ) -> anyhow::Result<()> {
     // TODO: clean up, consolidate, etc.
@@ -272,15 +272,8 @@ async fn get_claude_code_locations(
                 })
             })
             .collect();
-    let output = tokio::process::Command::new("pgrep")
-        .args(["-x", "claude"])
-        .output()
-        .await?;
-    let pids: HashSet<String> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(|s| s.to_string())
-        .collect();
-    for pid in &pids {
+    let agent_pid_list = get_agent_pids().await?;
+    for (agent, pid) in &agent_pid_list {
         let tty_output = tokio::process::Command::new("ps")
             .args(["-p", pid, "-o", "tty="])
             .output()
@@ -301,7 +294,7 @@ async fn get_claude_code_locations(
 
         if let (Some(tmux_location), Some(cwd)) = (tmux_location_map.get(&tty), cwd) {
             let session = AgentSessionInfo::new(
-                Agent::ClaudeCode,
+                agent.clone(),
                 cwd.clone(),
                 tty,
                 pid.to_string(),
@@ -317,13 +310,24 @@ async fn get_claude_code_locations(
                 let mut writable_session_info = session_info.write().await;
                 writable_session_info.insert(cwd.clone(), session);
             }
-            print_info(&format!("Detected session for {cwd}"));
+            print_info(&format!("Detected {agent} session for {cwd}"));
         } else {
             print_error(&format!(
-                "Can't gather enough information for {:?} session on pid {pid}",
-                Agent::ClaudeCode
+                "Can't gather enough information for {agent} session on pid {pid}",
             ));
         }
     }
     Ok(())
+}
+
+async fn get_agent_pids() -> anyhow::Result<Vec<(Agent, String)>> {
+    let output = tokio::process::Command::new("pgrep")
+        .args(["-x", "claude"])
+        .output()
+        .await?;
+    let claude_code_pids: Vec<(Agent, String)> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|s| (Agent::ClaudeCode, s.to_string()))
+        .collect();
+    Ok(claude_code_pids)
 }
