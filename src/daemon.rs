@@ -272,7 +272,7 @@ async fn get_agent_locations(
                 })
             })
             .collect();
-    let agent_pid_list= get_agent_pids().await?;
+    let agent_pid_list = get_agent_pids().await?;
     for (agent, pid) in &agent_pid_list {
         let tty_output = tokio::process::Command::new("ps")
             .args(["-p", pid, "-o", "tty="])
