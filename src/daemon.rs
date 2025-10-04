@@ -163,6 +163,7 @@ async fn handle_connection(
     Ok(())
 }
 
+// TODO: handle multiple sessions associated with the same cwd
 async fn handle_send(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
     cwd: &str,
@@ -304,6 +305,7 @@ async fn get_agent_locations(
                     tmux_location.2.to_string(),
                 ),
             );
+            print_debug(&format!("{:?}", &session));
             // Scope for the write lock
             // TODO: what if there're two sessions under the same cwd?
             {
@@ -321,13 +323,22 @@ async fn get_agent_locations(
 }
 
 async fn get_agent_pids() -> anyhow::Result<Vec<(Agent, String)>> {
-    let output = tokio::process::Command::new("pgrep")
-        .args(["-x", "claude"])
-        .output()
-        .await?;
-    let claude_code_pids: Vec<(Agent, String)> = String::from_utf8_lossy(&output.stdout)
+    let (output_claude, output_codex) = tokio::join!(
+        tokio::process::Command::new("pgrep")
+            .args(["-x", "claude"])
+            .output(),
+        tokio::process::Command::new("pgrep")
+            .args(["-f", "codex"])
+            .output(),
+    );
+    let pids = String::from_utf8_lossy(&output_claude?.stdout)
         .lines()
         .map(|s| (Agent::ClaudeCode, s.to_string()))
+        .chain(
+            String::from_utf8_lossy(&output_codex?.stdout)
+                .lines()
+                .map(|s| (Agent::Codex, s.to_string())),
+        )
         .collect();
-    Ok(claude_code_pids)
+    Ok(pids)
 }
