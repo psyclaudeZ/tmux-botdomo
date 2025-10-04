@@ -163,6 +163,7 @@ async fn handle_connection(
     Ok(())
 }
 
+// TODO: handle multiple sessions associated with the same cwd
 async fn handle_send(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
     cwd: &str,
