@@ -5,6 +5,7 @@ use std::fmt;
 pub enum Agent {
     ClaudeCode,
     Codex,
+    Gemini,
 }
 
 impl fmt::Display for Agent {
@@ -12,6 +13,7 @@ impl fmt::Display for Agent {
         match self {
             Agent::ClaudeCode => write!(f, "Claude Code"),
             Agent::Codex => write!(f, "Codex"),
+            Agent::Gemini => write!(f, "Gemini"),
         }
     }
 }

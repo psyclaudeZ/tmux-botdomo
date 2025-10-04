@@ -323,12 +323,15 @@ async fn get_agent_locations(
 }
 
 async fn get_agent_pids() -> anyhow::Result<Vec<(Agent, String)>> {
-    let (output_claude, output_codex) = tokio::join!(
+    let (output_claude, output_codex, output_gemini) = tokio::join!(
         tokio::process::Command::new("pgrep")
             .args(["-x", "claude"])
             .output(),
         tokio::process::Command::new("pgrep")
             .args(["-f", "codex"])
+            .output(),
+        tokio::process::Command::new("pgrep")
+            .args(["-f", "gemini"])
             .output(),
     );
     let pids = String::from_utf8_lossy(&output_claude?.stdout)
@@ -337,7 +340,12 @@ async fn get_agent_pids() -> anyhow::Result<Vec<(Agent, String)>> {
         .chain(
             String::from_utf8_lossy(&output_codex?.stdout)
                 .lines()
-                .map(|s| (Agent::Codex, s.to_string())),
+                .map(|s| (Agent::Codex, s.to_string()))
+                .chain(
+                    String::from_utf8_lossy(&output_gemini?.stdout)
+                        .lines()
+                        .map(|s| (Agent::Gemini, s.to_string())),
+                ),
         )
         .collect();
     Ok(pids)
