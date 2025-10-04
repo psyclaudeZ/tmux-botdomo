@@ -4,12 +4,14 @@ use std::fmt;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Agent {
     ClaudeCode,
+    Codex,
 }
 
 impl fmt::Display for Agent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Agent::ClaudeCode => write!(f, "Claude Code"),
+            Agent::Codex => write!(f, "Codex"),
         }
     }
 }
