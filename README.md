@@ -2,7 +2,7 @@
 
 Majordomo of AI assistants living in [tmux](https://github.com/tmux/tmux) sessions.
 
-Automatically detects Claude Code, Gemini, and Codex running in tmux panes and allows you to send code context directly from vim to the right AI assistant.
+Automatically detects Claude Code, Gemini, and Codex running in tmux panes and allows you to send context directly from vim to the right AI assistant.
 
 ## Installation
 
@@ -35,11 +35,9 @@ vim.keymap.set('v', '<leader>c', ':!tbdm send<CR>', { silent = true })
 
 ## Usage
 
-1. Select code in vim (visual mode)
-2. Press your configured keybinding)
-3. Selected conetext is sent to the detected AI assistant in your tmux session
-
-The daemon automatically detects which AI assistant (Claude Code, Gemini, or Codex) is running in your tmux panes based on the working directory and sends the context to the appropriate pane.
+1. Select code in vim/Neovim.
+2. Press your configured keybinding.
+3. Selected conetext is sent to the detected AI assistant in your tmux session, based on the working directories.
 
 ## Commands
 
@@ -47,7 +45,3 @@ The daemon automatically detects which AI assistant (Claude Code, Gemini, or Cod
 tbdm status     # Check daemon status
 tbdm send        # Send context to AI assistant (typically called from vim)
 ```
-
-## License
-
-MIT
