@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tmux_botdomo::logger::{print_debug, print_error, print_info};
 use tmux_botdomo::messages::{CliRequest, DaemonResponse, ResponseStatus, read_from_stream};
 use tmux_botdomo::session::{Agent, AgentSessionInfo, TmuxLocation};
-use tmux_botdomo::unix::{get_pid_file_path, get_socket_path};
+use tmux_botdomo::unix::{get_pid_file_path, get_socket_path, get_tmux_session_id};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
@@ -256,11 +256,16 @@ async fn get_agent_locations(
         ])
         .output()
         .await?;
+    let session_id = get_tmux_session_id();
     let tmux_location_map: HashMap<String, (String, String, String)> =
         String::from_utf8_lossy(&tmux_ls_output.stdout)
             .lines()
             .filter_map(|s| {
                 let segs: Vec<&str> = s.split_whitespace().collect();
+                // Only fetch ones within the same tmux session
+                if segs[0] != session_id {
+                    return None;
+                }
                 segs[3].strip_prefix("/dev/").map(|stripped_tty| {
                     (
                         stripped_tty.to_string(),
@@ -313,10 +318,6 @@ async fn get_agent_locations(
                 writable_session_info.insert(cwd.clone(), session);
             }
             print_info(&format!("Detected {agent} session for {cwd}"));
-        } else {
-            print_error(&format!(
-                "Can't gather enough information for {agent} session on pid {pid}",
-            ));
         }
     }
     Ok(())
