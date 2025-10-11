@@ -331,7 +331,7 @@ async fn get_agent_pids() -> anyhow::Result<Vec<(Agent, String)>> {
             .args(["-x", "codex"])
             .output(),
         tokio::process::Command::new("pgrep")
-            .args(["-f", r"(^|/)gemini($| )"])
+            .args(["-f", r"^node .*/bin/gemini"])
             .output(),
     );
     let pids = String::from_utf8_lossy(&output_claude?.stdout)
