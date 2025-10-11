@@ -328,10 +328,10 @@ async fn get_agent_pids() -> anyhow::Result<Vec<(Agent, String)>> {
             .args(["-x", "claude"])
             .output(),
         tokio::process::Command::new("pgrep")
-            .args(["-f", "codex"])
+            .args(["-x", "codex"])
             .output(),
         tokio::process::Command::new("pgrep")
-            .args(["-f", "gemini"])
+            .args(["-f", r"(^|/)gemini($| )"])
             .output(),
     );
     let pids = String::from_utf8_lossy(&output_claude?.stdout)
