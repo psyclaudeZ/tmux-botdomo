@@ -6,10 +6,12 @@ use tokio::time::sleep;
 async fn test_daemon_cil_communication() -> anyhow::Result<()> {
     let test_id = std::process::id();
     let socket_path = format!("/tmp/tmux-botdomo-test-{test_id}.sock");
+    let pid_path = format!("/tmp/tmux-botdomo-test-{test_id}.pid");
 
     let mut daemon = Command::new("cargo")
         .args(["run", "--features", "test-mode", "--bin", "tbdmd", "start"])
         .env("TMUX_BOTDOMO_SOCK_PATH", &socket_path)
+        .env("TMUX_BOTDOMO_PID_PATH", &pid_path)
         .spawn()?;
 
     sleep(Duration::from_millis(500)).await;
