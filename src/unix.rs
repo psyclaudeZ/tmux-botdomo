@@ -1,6 +1,6 @@
 pub fn get_pid_file_path() -> String {
-    let session_id = get_tmux_session_id();
     // TODO: XDG_RUNTIME_DIR?
+    let session_id = get_tmux_session_id();
     format!(
         "/tmp/tmux-botdomo-{}-{}.pid",
         std::env::var("USER").unwrap_or_else(|_| "unknown".to_string()),
@@ -9,12 +9,14 @@ pub fn get_pid_file_path() -> String {
 }
 
 pub fn get_socket_path() -> String {
-    let session_id = get_tmux_session_id();
-    std::env::var("TMUX_BOTDOMO_SOCK_PATH").unwrap_or(format!(
-        "/tmp/tmux-botdomo-{}-{}.sock",
-        std::env::var("USER").unwrap_or_else(|_| "unknown".to_string()),
-        session_id,
-    ))
+    std::env::var("TMUX_BOTDOMO_SOCK_PATH").unwrap_or_else(|_| {
+        let session_id = get_tmux_session_id();
+        format!(
+            "/tmp/tmux-botdomo-{}-{}.sock",
+            std::env::var("USER").unwrap_or_else(|_| "unknown".to_string()),
+            session_id,
+        )
+    })
 }
 
 pub fn get_tmux_session_id() -> String {
