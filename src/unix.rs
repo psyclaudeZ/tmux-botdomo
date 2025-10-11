@@ -17,6 +17,12 @@ pub fn get_socket_path() -> String {
     ))
 }
 
+#[cfg(feature = "test-mode")]
+pub fn get_tmux_session_id() -> String {
+    "test".to_string()
+}
+
+#[cfg(not(feature = "test-mode"))]
 pub fn get_tmux_session_id() -> String {
     std::process::Command::new("tmux")
         .args(["display-message", "-p", "#{session_id}"])
