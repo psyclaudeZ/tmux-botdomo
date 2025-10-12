@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use clap::{Parser, Subcommand};
 use nix::sys::signal;
 use nix::unistd::Pid;
@@ -57,6 +58,20 @@ impl Drop for FileGuard {
     }
 }
 
+struct DaemonState {
+    tmux_session_id: String,
+    start_ts: DateTime<Local>,
+}
+
+impl DaemonState {
+    fn new(tmux_session_id: String) -> Self {
+        Self {
+            tmux_session_id,
+            start_ts: Local::now(),
+        }
+    }
+}
+
 async fn start_daemon() -> anyhow::Result<()> {
     env_logger::Builder::new()
         .format(|buf, record| write!(buf, "{}", record.args()))
@@ -64,6 +79,8 @@ async fn start_daemon() -> anyhow::Result<()> {
         .init();
 
     print_info("Starting daemon...");
+    let session_id = get_tmux_session_id();
+    let daemon_state = Arc::new(DaemonState::new(session_id));
     // TODO: check instance, socket
     let pid_path = PathBuf::from(get_pid_file_path());
     if pid_path.exists() {
@@ -91,8 +108,9 @@ async fn start_daemon() -> anyhow::Result<()> {
         tokio::select! {
             Ok((stream, _)) = listener.accept() => {
                 let session_info_clone = session_info.clone();
+                let daemon_state_clone = daemon_state.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = handle_connection(stream, session_info_clone).await {
+                    if let Err(e) = handle_connection(stream, session_info_clone, daemon_state_clone).await {
                         print_error(&format!("Connect error {e}"));
                     };
                 });
@@ -100,7 +118,7 @@ async fn start_daemon() -> anyhow::Result<()> {
             _ = main_loop_interval.tick() => {
                 // TODO: state management
                 let session_info_clone = session_info.clone();
-                get_agent_locations(session_info_clone).await?;
+                get_agent_locations(session_info_clone, daemon_state.as_ref()).await?;
             }
             _ = tokio::signal::ctrl_c() => {
                 print_info("Received SIGINT, shutting down...");
@@ -119,6 +137,7 @@ async fn start_daemon() -> anyhow::Result<()> {
 async fn handle_connection(
     mut stream: UnixStream,
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+    daemon_state: Arc<DaemonState>,
 ) -> anyhow::Result<()> {
     let buffer = read_from_stream(&mut stream).await?;
     print_debug(&format!("Received {buffer}"));
@@ -133,7 +152,11 @@ async fn handle_connection(
                 DaemonResponse {
                     status: ResponseStatus::Success,
                     payload: Some(serialized),
-                    message: None,
+                    message: Some(format!(
+                        "Daemon started at {}, up for {} seconds",
+                        daemon_state.start_ts.format("%Y-%m-%d %H:%M:%S"),
+                        (Local::now() - daemon_state.start_ts).as_seconds_f64(),
+                    )),
                 }
             } else {
                 DaemonResponse {
@@ -237,6 +260,7 @@ async fn stop_daemon() -> anyhow::Result<()> {
 #[cfg(feature = "test-mode")]
 async fn get_agent_locations(
     _session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+    _daemon_state: &DaemonState,
 ) -> anyhow::Result<()> {
     print_info("Test mode: skipping agent location detection");
     Ok(())
@@ -245,6 +269,7 @@ async fn get_agent_locations(
 #[cfg(not(feature = "test-mode"))]
 async fn get_agent_locations(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
+    daemon_state: &DaemonState,
 ) -> anyhow::Result<()> {
     // TODO: clean up, consolidate, etc.
     let tmux_ls_output = tokio::process::Command::new("tmux")
@@ -256,14 +281,13 @@ async fn get_agent_locations(
         ])
         .output()
         .await?;
-    let session_id = get_tmux_session_id();
     let tmux_location_map: HashMap<String, (String, String, String)> =
         String::from_utf8_lossy(&tmux_ls_output.stdout)
             .lines()
             .filter_map(|s| {
                 let segs: Vec<&str> = s.split_whitespace().collect();
                 // Only fetch ones within the same tmux session
-                if segs[0] != session_id {
+                if segs[0] != daemon_state.tmux_session_id {
                     return None;
                 }
                 segs[3].strip_prefix("/dev/").map(|stripped_tty| {
