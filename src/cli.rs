@@ -40,6 +40,9 @@ async fn main() -> anyhow::Result<()> {
             if response.status == ResponseStatus::Success {
                 let session_info: HashMap<String, AgentSessionInfo> =
                     serde_json::from_value(response.payload.unwrap())?;
+                // HACK: taking advantage of the message field. Should probably serialized it in
+                // the payload?
+                println!("{}", response.message.unwrap_or("".to_string()));
                 for (i, (cwd, session)) in session_info.iter().enumerate() {
                     println!(
                         "Session #{i} - Agent: {}, cwd: {cwd}, pid: {}, tmux location: {}",
