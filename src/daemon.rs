@@ -154,9 +154,7 @@ async fn handle_connection(
                     payload: Some(serialized),
                     message: Some(format!(
                         "Daemon started at {}, up for {} seconds",
-                        daemon_state
-                            .start_ts
-                            .format("%Y-%m-%d %H:%M:%S"),
+                        daemon_state.start_ts.format("%Y-%m-%d %H:%M:%S"),
                         (Local::now() - daemon_state.start_ts).as_seconds_f64(),
                     )),
                 }
