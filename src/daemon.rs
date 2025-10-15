@@ -78,8 +78,8 @@ async fn start_daemon() -> anyhow::Result<()> {
         .init();
 
     print_info("Starting daemon...");
-    if let None = get_tmux_session_id() {
-        print_error(&format!("Must be run within a tmux session."));
+    if get_tmux_session_id().is_none() {
+        print_error("Must be run within a tmux session.");
         bail!("Not in a tmux session");
     }
     let daemon_state = Arc::new(DaemonState::new());
@@ -123,7 +123,7 @@ async fn start_daemon() -> anyhow::Result<()> {
                     let session_info_clone = session_info.clone();
                     get_agent_locations(session_info_clone, &tmux_session_id).await?;
                 } else {
-                    print_error(&format!("tmux session no longer exists, assuming it's already closed. Exiting."));
+                    print_error("tmux session no longer exists, assuming it's already closed. Exiting.");
                     break;
                 }
             }
