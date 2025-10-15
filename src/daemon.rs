@@ -1,3 +1,4 @@
+use anyhow::bail;
 use chrono::{DateTime, Local};
 use clap::{Parser, Subcommand};
 use nix::sys::signal;
@@ -59,14 +60,12 @@ impl Drop for FileGuard {
 }
 
 struct DaemonState {
-    tmux_session_id: String,
     start_ts: DateTime<Local>,
 }
 
 impl DaemonState {
-    fn new(tmux_session_id: String) -> Self {
+    fn new() -> Self {
         Self {
-            tmux_session_id,
             start_ts: Local::now(),
         }
     }
@@ -79,8 +78,11 @@ async fn start_daemon() -> anyhow::Result<()> {
         .init();
 
     print_info("Starting daemon...");
-    let session_id = get_tmux_session_id();
-    let daemon_state = Arc::new(DaemonState::new(session_id));
+    if get_tmux_session_id().is_none() {
+        print_error("Must be run within a tmux session.");
+        bail!("Not in a tmux session");
+    }
+    let daemon_state = Arc::new(DaemonState::new());
     // TODO: check instance, socket
     let pid_path = PathBuf::from(get_pid_file_path());
     if pid_path.exists() {
@@ -117,8 +119,13 @@ async fn start_daemon() -> anyhow::Result<()> {
             }
             _ = main_loop_interval.tick() => {
                 // TODO: state management
-                let session_info_clone = session_info.clone();
-                get_agent_locations(session_info_clone, daemon_state.as_ref()).await?;
+                if let Some(tmux_session_id) = get_tmux_session_id() {
+                    let session_info_clone = session_info.clone();
+                    get_agent_locations(session_info_clone, &tmux_session_id).await?;
+                } else {
+                    print_error("tmux session no longer exists, assuming it's already closed. Exiting.");
+                    break;
+                }
             }
             _ = tokio::signal::ctrl_c() => {
                 print_info("Received SIGINT, shutting down...");
@@ -260,7 +267,7 @@ async fn stop_daemon() -> anyhow::Result<()> {
 #[cfg(feature = "test-mode")]
 async fn get_agent_locations(
     _session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
-    _daemon_state: &DaemonState,
+    _session_id: &str,
 ) -> anyhow::Result<()> {
     print_info("Test mode: skipping agent location detection");
     Ok(())
@@ -269,7 +276,7 @@ async fn get_agent_locations(
 #[cfg(not(feature = "test-mode"))]
 async fn get_agent_locations(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
-    daemon_state: &DaemonState,
+    tmux_session_id: &str,
 ) -> anyhow::Result<()> {
     // TODO: clean up, consolidate, etc.
     let tmux_ls_output = tokio::process::Command::new("tmux")
@@ -287,7 +294,7 @@ async fn get_agent_locations(
             .filter_map(|s| {
                 let segs: Vec<&str> = s.split_whitespace().collect();
                 // Only fetch ones within the same tmux session
-                if segs[0] != daemon_state.tmux_session_id {
+                if segs[0] != tmux_session_id {
                     return None;
                 }
                 segs[3].strip_prefix("/dev/").map(|stripped_tty| {
