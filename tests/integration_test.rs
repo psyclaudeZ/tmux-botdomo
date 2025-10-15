@@ -18,7 +18,7 @@ async fn test_daemon_cil_communication() -> anyhow::Result<()> {
     }
 
     let output = Command::new("cargo")
-        .args(["run", "--bin", "tbdm", "send", ""])
+        .args(["run", "--features", "test-mode", "--bin", "tbdm", "send", ""])
         .env("TMUX_BOTDOMO_SOCK_PATH", &socket_path)
         .output()
         .await?;
