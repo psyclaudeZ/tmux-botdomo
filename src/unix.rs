@@ -19,7 +19,7 @@ pub fn get_socket_path() -> String {
 
 #[cfg(feature = "test-mode")]
 pub fn get_tmux_session_id() -> Option<String> {
-    "test".to_string()
+    Some("test".to_string())
 }
 
 // Retrives the tmux session ID of the calling process is running on in.
