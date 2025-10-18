@@ -20,7 +20,7 @@ Add to your `.tmux.conf`:
 set-hook -g server-start "run-shell 'tbdmd start'"
 ```
 
-Note that `session-closed` hook is currently broken in tmux 3.5a and doesn't get triggered as expected. Therefore, the approach that `tbdmd` takes is an automatic shutdown once it detects there's no longer a tmux session.
+Note that `session-closed` hook is currently broken in tmux 3.5a and doesn't get triggered as expected. Therefore, `tbdmd` automatically shuts down when it detects the tmux session no longer exists.
 
 ### 2. Configure vim
 
