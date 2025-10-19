@@ -28,6 +28,7 @@ struct Args {
 enum Command {
     Start,
     Stop,
+    Version,
 }
 
 #[tokio::main]
@@ -37,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Command::Start => start_daemon().await?,
         Command::Stop => stop_daemon().await?,
+        Command::Version => handle_version().await?,
     }
 
     Ok(())
@@ -381,4 +383,9 @@ async fn get_agent_pids() -> anyhow::Result<Vec<(Agent, String)>> {
         )
         .collect();
     Ok(pids)
+}
+
+async fn handle_version() -> anyhow::Result<()> {
+    println!("tmux-botdomo v{}", env!("CARGO_PKG_VERSION"));
+    Ok(())
 }
