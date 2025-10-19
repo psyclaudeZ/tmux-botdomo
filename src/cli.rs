@@ -16,6 +16,7 @@ struct Args {
 enum Command {
     Send { context: String },
     Status,
+    Version,
 }
 
 #[tokio::main]
@@ -55,6 +56,9 @@ async fn main() -> anyhow::Result<()> {
                     response.message.unwrap_or("".to_string())
                 );
             }
+        }
+        Command::Version => {
+            println!("tmux-botdomo v{}", env!("CARGO_PKG_VERSION"));
         }
     }
 
