@@ -22,23 +22,23 @@ set-hook -g server-start "run-shell 'tbdmd start'"
 
 Note that `session-closed` hook is currently broken in tmux 3.5a and doesn't get triggered as expected. Therefore, `tbdmd` automatically shuts down when it detects the tmux session no longer exists.
 
-### 2. Configure vim
+### 2. Configure Neovim
 
-Add to your `.vimrc` or `init.vim`:
-```vim
-vnoremap <leader>c :'<,'>!tbdm send<CR>
-```
-
-Or for Neovim with Lua:
 ```lua
-vim.keymap.set('v', '<leader>c', ':!tbdm send<CR>', { silent = true })
+vim.keymap.set('v', '<leader>tb', function()
+  vim.cmd('normal! "zy')
+  local context = vim.fn.getreg('z')
+  vim.fn.system('tbdm send ' .. vim.fn.shellescape(context))
+end)
 ```
+
+This essentially mimics yanking.
 
 ## Usage
 
 1. Select code in vim/Neovim.
 2. Press your configured keybinding.
-3. Selected conetext is sent to the detected AI assistant in your tmux session, based on the working directories.
+3. Selected conetext is sent to the detected AI assistant in your tmux session, **based on the working directories**.
 
 ## Commands
 
