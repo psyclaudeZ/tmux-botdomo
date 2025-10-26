@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
                 println!("{}", response.message.unwrap_or("".to_string()));
                 for (i, (cwd, session)) in session_info.iter().enumerate() {
                     println!(
-                        "Session #{i} - Agent: {}, cwd: {cwd}, pid: {}, tmux location: {}",
+                        "Agent #{i}: {}, cwd: {cwd}, pid: {}, tmux location: {}",
                         session.agent, session.pid, session.tmux_location,
                     );
                 }
