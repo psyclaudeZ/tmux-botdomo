@@ -151,7 +151,11 @@ async fn handle_connection(
     let buffer = read_from_stream(&mut stream).await?;
     print_debug(&format!("Received {buffer}"));
     let response = match serde_json::from_str(&buffer) {
-        Ok(CliRequest::Send { cwd, context , no_follow}) => {
+        Ok(CliRequest::Send {
+            cwd,
+            context,
+            no_follow,
+        }) => {
             print_info(&format!("Received cwd: {cwd:?} context: {context:?}"));
             handle_send(session_info, &cwd, &context, no_follow).await?
         }
@@ -238,7 +242,11 @@ async fn handle_send(
 }
 
 #[cfg(feature = "test-mode")]
-async fn relay_to_tmux(_pane_target: &str, _context: &str, _should_not_follow: bool) -> anyhow::Result<Output> {
+async fn relay_to_tmux(
+    _pane_target: &str,
+    _context: &str,
+    _should_not_follow: bool,
+) -> anyhow::Result<Output> {
     println!("Running in test mode. No messages is actually relayed.");
     Ok(Output {
         status: std::process::ExitStatus::default(),
@@ -248,7 +256,11 @@ async fn relay_to_tmux(_pane_target: &str, _context: &str, _should_not_follow: b
 }
 
 #[cfg(not(feature = "test-mode"))]
-async fn relay_to_tmux(pane_target: &str, context: &str, should_not_follow: bool) -> anyhow::Result<Output> {
+async fn relay_to_tmux(
+    pane_target: &str,
+    context: &str,
+    should_not_follow: bool,
+) -> anyhow::Result<Output> {
     let mut args = Vec::new();
     if !should_not_follow {
         args.extend(["select-pane", "-t", pane_target, ";"]);
