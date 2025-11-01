@@ -14,7 +14,12 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
-    Send { context: String },
+    Send { 
+        context: String,
+
+        #[arg(long)]
+        no_follow: bool,
+    },
     Status,
     Version,
 }
@@ -24,12 +29,12 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Command::Send { context } => {
+        Command::Send { context , no_follow } => {
             let cwd = std::env::current_dir()
                 .ok()
                 .map(|s| s.to_string_lossy().to_string());
             if let Some(cwd) = cwd {
-                let request = CliRequest::Send { cwd, context };
+                let request = CliRequest::Send { cwd, context, no_follow };
                 send_to_daemon(request).await?;
             } else {
                 eprintln!("Failed to obtain cwd for the client.");

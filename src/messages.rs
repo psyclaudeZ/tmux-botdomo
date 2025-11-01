@@ -5,7 +5,7 @@ use tokio::net::UnixStream;
 
 #[derive(Serialize, Deserialize)]
 pub enum CliRequest {
-    Send { cwd: String, context: String },
+    Send { cwd: String, context: String, no_follow: bool },
     Status,
 }
 

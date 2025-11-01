@@ -151,9 +151,9 @@ async fn handle_connection(
     let buffer = read_from_stream(&mut stream).await?;
     print_debug(&format!("Received {buffer}"));
     let response = match serde_json::from_str(&buffer) {
-        Ok(CliRequest::Send { cwd, context }) => {
+        Ok(CliRequest::Send { cwd, context , no_follow}) => {
             print_info(&format!("Received cwd: {cwd:?} context: {context:?}"));
-            handle_send(session_info, &cwd, &context).await?
+            handle_send(session_info, &cwd, &context, no_follow).await?
         }
         Ok(CliRequest::Status) => {
             let sessions = session_info.read().await;
@@ -200,6 +200,7 @@ async fn handle_send(
     session_info: Arc<RwLock<HashMap<String, AgentSessionInfo>>>,
     cwd: &str,
     context: &str,
+    should_not_follow: bool,
 ) -> anyhow::Result<DaemonResponse> {
     let sessions = session_info.read().await;
     if let Some(session) = sessions.get(cwd) {
@@ -210,7 +211,7 @@ async fn handle_send(
             session.tmux_location.window_id,
             session.tmux_location.pane_id
         );
-        let res = relay_to_tmux(&pane_target, context).await;
+        let res = relay_to_tmux(&pane_target, context, should_not_follow).await;
 
         match res {
             Ok(_) => Ok(DaemonResponse {
@@ -237,7 +238,7 @@ async fn handle_send(
 }
 
 #[cfg(feature = "test-mode")]
-async fn relay_to_tmux(_pane_target: &str, _context: &str) -> anyhow::Result<Output> {
+async fn relay_to_tmux(_pane_target: &str, _context: &str, _should_not_follow: bool) -> anyhow::Result<Output> {
     println!("Running in test mode. No messages is actually relayed.");
     Ok(Output {
         status: std::process::ExitStatus::default(),
@@ -247,9 +248,14 @@ async fn relay_to_tmux(_pane_target: &str, _context: &str) -> anyhow::Result<Out
 }
 
 #[cfg(not(feature = "test-mode"))]
-async fn relay_to_tmux(pane_target: &str, context: &str) -> anyhow::Result<Output> {
+async fn relay_to_tmux(pane_target: &str, context: &str, should_not_follow: bool) -> anyhow::Result<Output> {
+    let mut args = Vec::new();
+    if !should_not_follow {
+        args.extend(["select-pane", "-t", pane_target, ";"]);
+    }
+    args.extend(["send-keys", "-t", pane_target, context]);
     tokio::process::Command::new("tmux")
-        .args(["send-keys", "-t", pane_target, context])
+        .args(args)
         .output()
         .await
         .map_err(anyhow::Error::from)
