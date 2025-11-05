@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI main"]
+    types: [completed]
+
+# TODO: build for other platforms
+jobs:
+  publish:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'main')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+      - name: Check tags
+        id: check-tags
+        run: |
+          # Unfortunately, the tag isn't available in github.context when it's triggered by workflow_run. Hence when
+          # are checking the tags manually here.
+          echo "[debug] Conclusion: ${{github.event.workflow_run.conclusion }}"
+          echo "[debug] Head branch: ${{github.event.workflow_run.head_branch }}"
+
+          # Get all tags pointing to current commit
+          CURRENT_TAGS=$(git tag --points-at HEAD)
+          echo "Tags on current commit: $CURRENT_TAGS"
+
+          # Check if any tag matches our release pattern
+          RELEASE_TAG=""
+          for tag in $CURRENT_TAGS; do
+            if [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ $tag =~ ^test-.+ ]]; then
+              RELEASE_TAG=$tag
+              echo "Found release tag: $tag"
+              break
+            fi
+          done
+
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "No release tag found, skipping release"
+            echo "skip_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release tag found: $RELEASE_TAG"
+            echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+            echo "skip_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Rust targets
+        if: steps.check-tags.outputs.skip_release == 'false'
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
+
+      # - name: Build universal binary
+      #   if: steps.check-tags.outputs.skip_release == 'false'
+      #   run: |
+      #     cargo build --release --target x86_64-apple-darwin
+      #     cargo build --release --target aarch64-apple-darwin
+      #     lipo -create \
+      #       target/x86_64-apple-darwin/release/rfp \
+      #       target/aarch64-apple-darwin/release/rfp \
+      #       -output target/rfp-universal
+      #     tar -czf target/rfp-universal-apple-darwin.tar.gz -C target rfp-universal
+      #     echo "Binary SHA256:"
+      #     shasum -a 256 target/rfp-universal-apple-darwin.tar.gz
+
+      - name: Publish to crates.io
+        if: steps.check-tags.outputs.skip_release == 'false'
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      # - name: Create GitHub Release
+      #   if: steps.check-tags.outputs.skip_release == 'false'
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     tag_name: ${{ steps.check-tags.outputs.release_tag }}
+      #     files: target/rfp-universal-apple-darwin.tar.gz
+      #     draft: true
